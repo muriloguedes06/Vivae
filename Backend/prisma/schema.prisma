@@ -1,0 +1,451 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CUSTOMER
+  ORGANIZER
+  GATE_STAFF
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+  DELETED
+}
+
+enum EventCategory {
+  CONCERT
+  MOVIE
+  FESTIVAL
+  CONFERENCE
+  WORKSHOP
+  THEATER
+  SPORTS
+  OTHER
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  SALES_PAUSED
+  SOLD_OUT
+  CANCELLED
+  FINISHED
+}
+
+enum SessionStatus {
+  SCHEDULED
+  CANCELLED
+  FINISHED
+}
+
+enum TicketingMode {
+  GENERAL_ADMISSION
+  RESERVED_SEATING
+}
+
+enum StaffRole {
+  MANAGER
+  CHECK_IN
+  VIEWER
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELLED
+  EXPIRED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  APPROVED
+  DECLINED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  PIX
+  BOLETO
+  SIMULATED
+}
+
+enum TicketStatus {
+  ACTIVE
+  USED
+  CANCELLED
+  REFUNDED
+}
+
+enum ValidationStatus {
+  VALID
+  INVALID
+  ALREADY_USED
+  WRONG_EVENT
+  CANCELLED_TICKET
+}
+
+model User {
+  id       String  @id @default(cuid())
+  username String  @unique
+  email    String  @unique
+  password String
+  lastname String?
+
+  phone           String?
+  avatarUrl       String?
+  role            UserRole   @default(CUSTOMER)
+  status          UserStatus @default(ACTIVE)
+  emailVerifiedAt DateTime?
+  lastLoginAt     DateTime?
+
+  organizedEvents  Event[]            @relation("EventOrganizer")
+  staffMemberships EventStaff[]
+  orders           Order[]
+  tickets          Ticket[]           @relation("TicketOwner")
+  validations      TicketValidation[] @relation("ValidationOperator")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([role, status])
+}
+
+/// Modelo-base que o organizador escolhe no catálogo.
+model CatalogEvent {
+  id          String        @id @default(cuid())
+  slug        String        @unique
+  title       String
+  description String        @db.Text
+  category    EventCategory
+  coverUrl    String?
+  bannerUrl   String?
+  ageRating   String?
+  durationMin Int?
+  metadata    Json?
+  active      Boolean       @default(true)
+  events      Event[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([category, active])
+}
+
+model Event {
+  id                 String        @id @default(cuid())
+  organizerId        String
+  catalogEventId     String?
+  venueId            String?
+  slug               String        @unique
+  title              String
+  description        String        @db.Text
+  category           EventCategory
+  status             EventStatus   @default(DRAFT)
+  ticketingMode      TicketingMode @default(GENERAL_ADMISSION)
+  coverUrl           String?
+  bannerUrl          String?
+  ageRating          String?
+  timezone           String        @default("America/Sao_Paulo")
+  salesStartAt       DateTime?
+  salesEndAt         DateTime?
+  publishedAt        DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?
+
+  organizer    User               @relation("EventOrganizer", fields: [organizerId], references: [id], onDelete: Restrict)
+  catalogEvent CatalogEvent?      @relation(fields: [catalogEventId], references: [id], onDelete: SetNull)
+  venue        Venue?             @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  sessions     EventSession[]
+  ticketTypes  TicketType[]
+  seatMap      SeatMap?
+  staff        EventStaff[]
+  orders       Order[]
+  tickets      Ticket[]
+  validations  TicketValidation[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([organizerId, status])
+  @@index([category, status])
+  @@index([salesStartAt, salesEndAt])
+}
+
+model Venue {
+  id         String         @id @default(cuid())
+  name       String
+  address    String
+  number     String?
+  complement String?
+  district   String?
+  city       String
+  state      String
+  postalCode String?
+  country    String         @default("BR")
+  latitude   Decimal?       @db.Decimal(10, 7)
+  longitude  Decimal?       @db.Decimal(10, 7)
+  events     Event[]
+  sessions   EventSession[]
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@index([city, state])
+}
+
+/// Data/horário específico, permitindo várias sessões por evento.
+model EventSession {
+  id         String        @id @default(cuid())
+  eventId    String
+  venueId    String?
+  name       String?
+  startsAt   DateTime
+  endsAt     DateTime?
+  status     SessionStatus @default(SCHEDULED)
+  event      Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  venue      Venue?        @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  ticketLots TicketLot[]
+  orderItems OrderItem[]
+  tickets    Ticket[]
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([eventId, startsAt])
+  @@index([status, startsAt])
+}
+
+/// Categoria comercial: Pista, Premium, VIP etc.
+model TicketType {
+  id          String      @id @default(cuid())
+  eventId     String
+  name        String
+  description String?
+  color       String?
+  capacity    Int
+  sortOrder   Int         @default(0)
+  active      Boolean     @default(true)
+  event       Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  lots        TicketLot[]
+  seats       Seat[]
+  orderItems  OrderItem[]
+  tickets     Ticket[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@unique([eventId, name])
+  @@index([eventId, active, sortOrder])
+}
+
+/// Lote com preço, estoque e janela de venda próprios.
+model TicketLot {
+  id           String        @id @default(cuid())
+  ticketTypeId String
+  sessionId    String?
+  name         String
+  price        Decimal       @db.Decimal(12, 2)
+  fee          Decimal       @default(0) @db.Decimal(12, 2)
+  quantity     Int
+  sold         Int           @default(0)
+  reserved     Int           @default(0)
+  salesStart   DateTime?
+  salesEnd     DateTime?
+  active       Boolean       @default(true)
+  ticketType   TicketType    @relation(fields: [ticketTypeId], references: [id], onDelete: Cascade)
+  session      EventSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  orderItems   OrderItem[]
+  tickets      Ticket[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([ticketTypeId, sessionId, name])
+  @@index([sessionId, active])
+  @@index([salesStart, salesEnd])
+}
+
+model SeatMap {
+  id        String   @id @default(cuid())
+  eventId   String   @unique
+  name      String
+  rows      Int
+  columns   Int
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  seats     Seat[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Seat {
+  id           String      @id @default(cuid())
+  seatMapId    String
+  ticketTypeId String?
+  row          String
+  number       Int
+  label        String
+  accessible   Boolean     @default(false)
+  blocked      Boolean     @default(false)
+  posX         Int?
+  posY         Int?
+  seatMap      SeatMap     @relation(fields: [seatMapId], references: [id], onDelete: Cascade)
+  ticketType   TicketType? @relation(fields: [ticketTypeId], references: [id], onDelete: SetNull)
+  tickets      Ticket[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@unique([seatMapId, row, number])
+  @@unique([seatMapId, label])
+  @@index([ticketTypeId])
+}
+
+model EventStaff {
+  id        String    @id @default(cuid())
+  eventId   String
+  userId    String
+  role      StaffRole @default(CHECK_IN)
+  active    Boolean   @default(true)
+  event     Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([eventId, userId])
+  @@index([userId, active])
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  userId        String
+  eventId       String
+  code          String      @unique
+  status        OrderStatus @default(PENDING)
+  subtotal      Decimal     @db.Decimal(12, 2)
+  feeTotal      Decimal     @default(0) @db.Decimal(12, 2)
+  discountTotal Decimal     @default(0) @db.Decimal(12, 2)
+  total         Decimal     @db.Decimal(12, 2)
+  expiresAt     DateTime?
+  paidAt        DateTime?
+  cancelledAt   DateTime?
+  user          User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  event         Event       @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  items         OrderItem[]
+  payments      Payment[]
+  tickets       Ticket[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([userId, status, createdAt])
+  @@index([eventId, status])
+  @@index([status, expiresAt])
+}
+
+/// Snapshot do item e preço no momento da compra.
+model OrderItem {
+  id           String        @id @default(cuid())
+  orderId      String
+  ticketTypeId String
+  ticketLotId  String
+  sessionId    String?
+  description  String
+  quantity     Int
+  unitPrice    Decimal       @db.Decimal(12, 2)
+  unitFee      Decimal       @default(0) @db.Decimal(12, 2)
+  subtotal     Decimal       @db.Decimal(12, 2)
+  order        Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  ticketType   TicketType    @relation(fields: [ticketTypeId], references: [id], onDelete: Restrict)
+  ticketLot    TicketLot     @relation(fields: [ticketLotId], references: [id], onDelete: Restrict)
+  session      EventSession? @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  tickets      Ticket[]
+  createdAt    DateTime      @default(now())
+
+  @@index([orderId])
+  @@index([ticketLotId])
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  orderId       String
+  provider      String?
+  providerRef   String?       @unique
+  method        PaymentMethod
+  status        PaymentStatus @default(PENDING)
+  amount        Decimal       @db.Decimal(12, 2)
+  installments  Int           @default(1)
+  cardBrand     String?
+  cardLastFour  String?
+  failureCode   String?
+  failureReason String?
+  processedAt   DateTime?
+  refundedAt    DateTime?
+  metadata      Json?
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([orderId, status])
+  @@index([status, createdAt])
+}
+
+model Ticket {
+  id           String             @id @default(cuid())
+  orderId      String
+  orderItemId  String
+  ownerId      String
+  eventId      String
+  sessionId    String?
+  ticketTypeId String
+  ticketLotId  String
+  seatId       String?
+  code         String             @unique
+  qrToken      String             @unique
+  status       TicketStatus       @default(ACTIVE)
+  holderName   String
+  holderEmail  String?
+  issuedAt     DateTime           @default(now())
+  usedAt       DateTime?
+  cancelledAt  DateTime?
+  order        Order              @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  orderItem    OrderItem          @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  owner        User               @relation("TicketOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  event        Event              @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  session      EventSession?      @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  ticketType   TicketType         @relation(fields: [ticketTypeId], references: [id], onDelete: Restrict)
+  ticketLot    TicketLot          @relation(fields: [ticketLotId], references: [id], onDelete: Restrict)
+  seat         Seat?              @relation(fields: [seatId], references: [id], onDelete: Restrict)
+  validations  TicketValidation[]
+
+  @@unique([sessionId, seatId])
+  @@index([ownerId, status])
+  @@index([eventId, status])
+  @@index([orderId])
+}
+
+/// Auditoria de leituras válidas e inválidas da portaria.
+model TicketValidation {
+  id          String           @id @default(cuid())
+  eventId     String
+  ticketId    String?
+  operatorId  String?
+  scannedCode String
+  status      ValidationStatus
+  reason      String?
+  deviceId    String?
+  gate        String?
+  metadata    Json?
+  scannedAt   DateTime         @default(now())
+  event       Event            @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  ticket      Ticket?          @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  operator    User?            @relation("ValidationOperator", fields: [operatorId], references: [id], onDelete: SetNull)
+
+  @@index([eventId, scannedAt])
+  @@index([ticketId, scannedAt])
+  @@index([operatorId, scannedAt])
+  @@index([status, scannedAt])
+}
