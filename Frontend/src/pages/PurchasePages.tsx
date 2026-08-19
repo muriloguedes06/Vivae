@@ -3,22 +3,37 @@ import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { AppHeader } from "../components/AppHeader";
 import { FormField } from "../components/FormField";
 import { Icon } from "../components/Icon";
-import { SeatMap } from "../components/SeatMap";
 import { useCountdown } from "../hooks/useCountdown";
 import { formatCardNumber, formatCurrency, formatExpiry } from "../utils/formatters";
-import { useTicketmasterEvent } from "../hooks/useTicketmasterEvent";
-import { ticketmasterToEventItem } from "../utils/ticketmaster";
-import { clearPurchaseDraft, getPurchaseDraft } from "../utils/purchaseDraft";
+import { clearPurchaseDraft, getPurchaseDraft, savePurchaseDraft } from "../utils/purchaseDraft";
+import { usePublishedEvent } from "../hooks/useLocalEvents";
+import { localEventToEventItem } from "../utils/localEvents";
 
 export function SeatsPage() {
   const [searchParams] = useSearchParams();
   const eventId = searchParams.get("eventId") ?? undefined;
-  const { event: ticketmasterEvent } = useTicketmasterEvent(eventId);
-  const event = ticketmasterEvent
-    ? ticketmasterToEventItem(ticketmasterEvent)
-    : undefined;
+  const { event: localEvent, loading, error } = usePublishedEvent(eventId);
+  const event = localEvent ? localEventToEventItem(localEvent) : undefined;
+  const [selected, setSelected] = useState<string[]>([]);
+  const ticketType = localEvent?.ticketTypes[0];
+  const columns = localEvent?.seats.length
+    ? Math.max(...localEvent.seats.map((seat) => seat.number))
+    : 1;
+
+  function toggleSeat(id: string) {
+    setSelected((current) => current.includes(id)
+      ? current.filter((seatId) => seatId !== id)
+      : current.length < 6 ? [...current, id] : current);
+  }
 
   if (!eventId) return <Navigate to="/eventos" replace />;
+  if (loading) return <main className="center-page">Carregando assentos...</main>;
+  if (error || !localEvent || !event || localEvent.ticketingMode !== "RESERVED_SEATING") {
+    return <main className="center-page"><p className="error-banner">Mapa de assentos indisponível.</p></main>;
+  }
+
+  const selectedSeats = localEvent.seats.filter((seat) => selected.includes(seat.id));
+  const total = selected.length * (ticketType?.price ?? 0);
 
   return (
     <>
@@ -32,15 +47,42 @@ export function SeatsPage() {
             <small>{event?.date ?? "Carregando evento..."}</small>
             <h1>{event?.title ?? "Evento"}</h1>
             <p>Escolha até 6 assentos no mapa abaixo.</p>
-            <SeatMap />
+            <div className="seat-layout">
+              <div className="screen">TELA</div>
+              <div className="seat-grid" style={{ gridTemplateColumns: `repeat(${columns}, 38px)` }}>
+                {localEvent.seats.map((seat) => (
+                  <button
+                    key={seat.id}
+                    title={seat.label}
+                    disabled={seat.occupied}
+                    className={`seat ${seat.occupied ? "occupied" : ""} ${selected.includes(seat.id) ? "selected" : ""}`}
+                    onClick={() => toggleSeat(seat.id)}
+                  >
+                    {seat.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </section>
           <aside className="purchase-card">
             <h2>Resumo do Pedido</h2>
-            <p>Ingresso Inteira × 2</p>
-            <strong>R$ 140,00</strong>
+            <p>{selectedSeats.length ? `Assentos: ${selectedSeats.map((seat) => seat.label).join(", ")}` : "Nenhum assento selecionado"}</p>
+            <strong>{formatCurrency(total)}</strong>
             <Link
-              className="button primary wide"
+              className={`button primary wide ${selected.length ? "" : "disabled"}`}
               to={`/checkout?eventId=${encodeURIComponent(eventId)}`}
+              onClick={() => ticketType && savePurchaseDraft({
+                event,
+                total,
+                lines: [{
+                  ticketTypeId: ticketType.id,
+                  name: ticketType.name,
+                  quantity: selected.length,
+                  unitPrice: ticketType.price,
+                  seatIds: selectedSeats.map((seat) => seat.id),
+                  seatLabels: selectedSeats.map((seat) => seat.label),
+                }],
+              })}
             >
               Ir para pagamento
             </Link>
@@ -56,11 +98,8 @@ export function CheckoutPage() {
   const [searchParams] = useSearchParams();
   const eventId = searchParams.get("eventId") ?? undefined;
   const [draft] = useState(() => getPurchaseDraft(eventId));
-  const { event: ticketmasterEvent, loading, error } =
-    useTicketmasterEvent(eventId);
-  const fetchedEvent = ticketmasterEvent
-    ? ticketmasterToEventItem(ticketmasterEvent)
-    : undefined;
+  const { event: localEvent, loading, error } = usePublishedEvent(eventId);
+  const fetchedEvent = localEvent ? localEventToEventItem(localEvent) : undefined;
   const selectedEvent = draft?.event ?? fetchedEvent;
   const total = draft?.total ?? 0;
   const timer = useCountdown(600);

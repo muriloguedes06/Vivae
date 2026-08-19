@@ -405,7 +405,8 @@ button {
 .filters > input,
 .filters select,
 .price-range input,
-.config-card input {
+.config-card input,
+.config-card textarea {
   height: 48px;
   border: 1px solid var(--line);
   border-radius: 5px;
@@ -529,6 +530,13 @@ button {
   border-top: 1px solid #ddd;
   padding-top: 18px;
   margin-top: 20px;
+}
+.event-content footer .simulated-price {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
 }
 .back {
   display: inline-flex;
@@ -858,6 +866,27 @@ button {
 .my-tickets p {
   color: var(--muted);
 }
+.ticket-state {
+  max-width: 620px;
+  margin: 48px auto;
+  padding: 36px;
+  text-align: center;
+  color: var(--muted);
+}
+.ticket-state > .material-symbols-outlined {
+  font-size: 58px;
+  color: var(--primary);
+}
+.ticket-state h2 {
+  color: var(--text);
+}
+.ticket-state .button {
+  display: inline-flex;
+  margin-top: 12px;
+}
+.ticket-state.error {
+  color: #a21b1b;
+}
 .ticket-page {
   min-height: 100vh;
   background: #e9edff;
@@ -1146,6 +1175,31 @@ button {
 .table-event small {
   color: var(--muted);
   font-weight: 400;
+}
+.table-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.table-actions a,
+.table-actions button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: var(--primary);
+  cursor: pointer;
+}
+.table-actions button {
+  color: #a21b1b;
+}
+.table-actions a:hover,
+.table-actions button:hover {
+  background: #edf1ff;
 }
 .status {
   font-style: normal;

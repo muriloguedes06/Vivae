@@ -38,6 +38,9 @@ export function EventCard({ event }: { event: EventItem }) {
           ) : (
             <strong>Consulte os ingressos</strong>
           )}
+          {event.priceSource === "simulated" && (
+            <small className="simulated-price">Valor demonstrativo</small>
+          )}
         </footer>
       </div>
     </Link>

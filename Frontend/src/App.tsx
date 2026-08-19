@@ -18,6 +18,7 @@ import {
   SmartScannerPage,
 } from "./pages/GatePages";
 import { RoleProtectedRoute } from "./components/RoleProtectedRoute";
+import { GuestOnlyRoute } from "./components/GuestOnlyRoute";
 import { AccessDeniedPage } from "./pages/AccessDeniedPage";
 import type { UserRole } from "./types";
 
@@ -35,8 +36,10 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Navigate to="/eventos" replace />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/criar-conta" element={<RegisterPage />} />
+        <Route element={<GuestOnlyRoute />}>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/criar-conta" element={<RegisterPage />} />
+        </Route>
         <Route path="/eventos" element={<EventsPage />} />
         <Route path="/eventos/:id" element={<EventDetailsPage />} />
         <Route element={<RoleProtectedRoute allowedRoles={authenticatedRoles} />}>

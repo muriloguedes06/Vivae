@@ -42,6 +42,7 @@ export function ticketmasterToEventItem(event: TicketmasterEvent): EventItem {
     price: priceRange?.min ?? 0,
     maxPrice: priceRange?.max,
     currency: priceRange?.currency,
+    priceSource: event.priceSource,
     category,
     image: image?.url ?? "https://placehold.co/640x360?text=Viva%C3%AA",
     sourceDate: start?.localDate,

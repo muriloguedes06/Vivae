@@ -15,7 +15,7 @@ export function OrganizerSidebar() {
       </div>
       <nav>
         {items.map(([icon, label, path]) => (
-          <NavLink key={label} to={path}>
+          <NavLink key={label} to={path} end={path === "/organizador"}>
             <Icon>{icon}</Icon>
             {label}
           </NavLink>

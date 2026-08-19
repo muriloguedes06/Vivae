@@ -26,4 +26,14 @@ export class CatalogEventsController {
   getTicketmasterEvent(@Param('id') id: string) {
     return this.catalogEventsService.getTicketmasterEvent(id);
   }
+
+  @Get('tmdb/movies')
+  getTmdbMovies(@Query('query') query?: string, @Query('page') page?: string) {
+    return this.catalogEventsService.getTmdbMovies(query, Number(page ?? 1));
+  }
+
+  @Get('tmdb/movies/:id')
+  getTmdbMovie(@Param('id') id: string) {
+    return this.catalogEventsService.getTmdbMovie(id);
+  }
 }

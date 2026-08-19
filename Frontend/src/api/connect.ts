@@ -76,7 +76,7 @@ api.interceptors.response.use(
     } catch (refreshError) {
       clearSession();
 
-      if (window.location.pathname !== "/login") {
+      if (!["/login", "/criar-conta"].includes(window.location.pathname)) {
         window.location.assign("/login");
       }
 

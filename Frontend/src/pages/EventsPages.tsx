@@ -3,12 +3,10 @@ import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import { AppHeader } from "../components/AppHeader";
 import { EventCard } from "../components/EventCard";
 import { Icon } from "../components/Icon";
-import { ticketTypes } from "../data/mockData";
 import { formatCurrency } from "../utils/formatters";
-import { useTicketmasterEvents } from "../hooks/useTicketmasterEvents";
-import { ticketmasterToEventItem } from "../utils/ticketmaster";
-import { useTicketmasterEvent } from "../hooks/useTicketmasterEvent";
 import { savePurchaseDraft } from "../utils/purchaseDraft";
+import { usePublishedEvent, usePublishedEvents } from "../hooks/useLocalEvents";
+import { localEventToEventItem } from "../utils/localEvents";
 
 export function EventsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -22,17 +20,10 @@ export function EventsPage() {
     city: "",
   });
   const [filters, setFilters] = useState(draftFilters);
-  const {
-    events: ticketmasterEvents,
-    loading,
-    loadingMore,
-    error,
-    hasMore,
-    loadMore,
-  } = useTicketmasterEvents(initialQuery);
+  const { events: publishedEvents, loading, error } = usePublishedEvents();
   const apiEvents = useMemo(
-    () => ticketmasterEvents.map(ticketmasterToEventItem),
-    [ticketmasterEvents],
+    () => publishedEvents.map(localEventToEventItem),
+    [publishedEvents],
   );
   const visible = useMemo(
     () =>
@@ -136,8 +127,7 @@ export function EventsPage() {
               />
             </div>
             <small className="filter-hint">
-              O filtro considera somente eventos com preço informado pela
-              Ticketmaster.
+              Os valores são definidos pelo organizador e validados no backend.
             </small>
             <b>Data</b>
             <input
@@ -207,18 +197,6 @@ export function EventsPage() {
                 <EventCard event={event} key={event.id} />
               ))}
             </div>
-            {hasMore && !loading && (
-              <div className="load-more">
-                <button
-                  className="button secondary"
-                  type="button"
-                  onClick={() => void loadMore()}
-                  disabled={loadingMore}
-                >
-                  {loadingMore ? "Carregando..." : "Mostrar mais"}
-                </button>
-              </div>
-            )}
           </section>
         </div>
       </main>
@@ -228,10 +206,8 @@ export function EventsPage() {
 
 export function EventDetailsPage() {
   const { id } = useParams();
-  const { event: ticketmasterEvent, loading, error } = useTicketmasterEvent(id);
-  const event = ticketmasterEvent
-    ? ticketmasterToEventItem(ticketmasterEvent)
-    : undefined;
+  const { event: localEvent, loading, error } = usePublishedEvent(id);
+  const event = localEvent ? localEventToEventItem(localEvent) : undefined;
 
   if (loading) {
     return <main className="center-page">Carregando evento...</main>;
@@ -271,8 +247,7 @@ export function EventDetailsPage() {
           <article>
             <h2>Descrição do Evento</h2>
             <p>
-              {event.description ??
-                "A Ticketmaster não forneceu uma descrição para este evento."}
+              {event.description}
             </p>
             {event.note && (
               <div className="event-note">
@@ -296,7 +271,7 @@ export function EventDetailsPage() {
             </strong>
             <Link
               className="button primary wide"
-              to={`/ingressos?eventId=${encodeURIComponent(event.id)}`}
+              to={`${localEvent?.ticketingMode === "RESERVED_SEATING" ? "/assentos" : "/ingressos"}?eventId=${encodeURIComponent(event.id)}`}
             >
               Comprar ingressos
             </Link>
@@ -313,15 +288,11 @@ export function EventDetailsPage() {
 export function TicketSelectionPage() {
   const [searchParams] = useSearchParams();
   const eventId = searchParams.get("eventId") ?? undefined;
-  const { event: ticketmasterEvent, loading, error } =
-    useTicketmasterEvent(eventId);
-  const selectedEvent = ticketmasterEvent
-    ? ticketmasterToEventItem(ticketmasterEvent)
-    : undefined;
-  const [quantities, setQuantities] = useState<Record<string, number>>({
-    pista: 1,
-  });
-  const total = ticketTypes.reduce(
+  const { event: localEvent, loading, error } = usePublishedEvent(eventId);
+  const selectedEvent = localEvent ? localEventToEventItem(localEvent) : undefined;
+  const availableTicketTypes = localEvent?.ticketTypes ?? [];
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const total = availableTicketTypes.reduce(
     (sum, type) => sum + type.price * (quantities[type.id] ?? 0),
     0,
   );
@@ -348,7 +319,7 @@ export function TicketSelectionPage() {
     );
   }
 
-  const lines = ticketTypes
+  const lines = availableTicketTypes
     .map((type) => ({
       ticketTypeId: type.id,
       name: type.name,
@@ -374,7 +345,7 @@ export function TicketSelectionPage() {
         </header>
         <h2>Ingressos Disponíveis</h2>
         <div className="ticket-types">
-          {ticketTypes.map((type) => (
+          {availableTicketTypes.map((type) => (
             <article key={type.id}>
               <div>
                 <h3>{type.name}</h3>
