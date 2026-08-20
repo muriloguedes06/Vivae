@@ -13,6 +13,10 @@ simulada de ingressos e validação de entrada por QR Code.
 
 ![Painel do organizador](./Frontend/public/Organizador.png)
 
+### Portaria
+
+![Portaria](./Frontend/public/Portaria.png)
+
 O repositório é dividido em:
 
 ```text
