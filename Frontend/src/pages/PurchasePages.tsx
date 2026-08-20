@@ -8,6 +8,7 @@ import { formatCardNumber, formatCurrency, formatExpiry } from "../utils/formatt
 import { clearPurchaseDraft, getPurchaseDraft, savePurchaseDraft } from "../utils/purchaseDraft";
 import { usePublishedEvent } from "../hooks/useLocalEvents";
 import { localEventToEventItem } from "../utils/localEvents";
+import { createOrder, simulatePayment } from "../api/api";
 
 export function SeatsPage() {
   const [searchParams] = useSearchParams();
@@ -103,20 +104,59 @@ export function CheckoutPage() {
   const selectedEvent = draft?.event ?? fetchedEvent;
   const total = draft?.total ?? 0;
   const timer = useCountdown(600);
+  const [cardholderName, setCardholderName] = useState("");
   const [card, setCard] = useState("");
   const [expiry, setExpiry] = useState("");
+  const [cvv, setCvv] = useState("");
   const [processing, setProcessing] = useState(false);
   const [success, setSuccess] = useState(false);
-  function submit(event: FormEvent) {
+  const [paymentError, setPaymentError] = useState("");
+  async function submit(event: FormEvent) {
     event.preventDefault();
+    if (!eventId || !draft?.lines.length) {
+      setPaymentError("Selecione ao menos um ingresso antes de pagar.");
+      return;
+    }
     setProcessing(true);
-    window.setTimeout(() => {
+    setPaymentError("");
+    try {
+      const order = await createOrder({
+        eventId,
+        items: draft.lines.map((line) => ({
+          ticketTypeId: line.ticketTypeId,
+          quantity: line.seatIds?.length ? undefined : line.quantity,
+          seatIds: line.seatIds,
+        })),
+      });
+      const payment = await simulatePayment({
+        orderId: order.id,
+        cardholderName,
+        cardNumber: card,
+        expiry,
+        cvv,
+      });
+      if (!payment.approved) {
+        setPaymentError("Pagamento recusado. Confira os dados do cartão de teste.");
+        setProcessing(false);
+        return;
+      }
+
+      const ticketId = payment.tickets[0]?.id;
+      if (!ticketId) {
+        setPaymentError("O pagamento foi aprovado, mas nenhum ingresso foi emitido.");
+        setProcessing(false);
+        return;
+      }
+
       setSuccess(true);
       window.setTimeout(
-        () => navigate(`/sucesso?eventId=${encodeURIComponent(eventId ?? "")}`),
+        () => navigate(`/sucesso?ticketId=${encodeURIComponent(ticketId)}`),
         1200,
       );
-    }, 2200);
+    } catch {
+      setPaymentError("Não foi possível concluir o pagamento. A reserva pode ter expirado ou o ingresso não está mais disponível.");
+      setProcessing(false);
+    }
   }
 
   if (!eventId) return <Navigate to="/eventos" replace />;
@@ -154,6 +194,8 @@ export function CheckoutPage() {
             <h2>Dados de Pagamento</h2>
             <FormField
               label="Nome no cartão"
+              value={cardholderName}
+              onChange={(e) => setCardholderName(e.target.value)}
               placeholder="NOME COMO ESTÁ NO CARTÃO"
               required
             />
@@ -173,8 +215,17 @@ export function CheckoutPage() {
                 placeholder="MM/AA"
                 required
               />
-              <FormField label="CVV" placeholder="123" maxLength={4} required />
+              <FormField
+                label="CVV"
+                value={cvv}
+                onChange={(e) => setCvv(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                placeholder="123"
+                maxLength={4}
+                required
+              />
             </div>
+            <small>Cartão de teste: Murilo Guedes · 4242 4242 4242 4242 · 01/35 · 426</small>
+            {paymentError && <p className="error-banner">{paymentError}</p>}
             <div className="notice">
               <Icon>info</Icon>
               <span>
@@ -245,7 +296,7 @@ export function CheckoutPage() {
 
 export function SuccessPage() {
   const [searchParams] = useSearchParams();
-  const eventId = searchParams.get("eventId");
+  const ticketId = searchParams.get("ticketId");
 
   useEffect(() => {
     clearPurchaseDraft();
@@ -264,7 +315,9 @@ export function SuccessPage() {
         </p>
         <Link
           className="button primary wide"
-          to={`/ingresso-digital${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`}
+          to={ticketId
+            ? `/ingresso-digital?ticketId=${encodeURIComponent(ticketId)}`
+            : "/meus-ingressos"}
         >
           Ver meu ingresso
         </Link>

@@ -165,6 +165,7 @@ export interface MyTicket {
   id: string;
   code: string;
   qrToken?: string;
+  shareToken?: string;
   status: TicketStatus;
   holderName: string;
   issuedAt: string;

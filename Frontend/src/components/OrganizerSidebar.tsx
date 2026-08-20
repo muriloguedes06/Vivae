@@ -22,6 +22,9 @@ export function OrganizerSidebar() {
         ))}
       </nav>
       <footer>
+        <NavLink to="/eventos">
+          <Icon>home</Icon>Voltar ao início
+        </NavLink>
         <a href="#help">
           <Icon>help</Icon>Central de ajuda
         </a>

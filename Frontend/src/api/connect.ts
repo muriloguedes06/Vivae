@@ -3,7 +3,7 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from "axios";
 
-const baseURL = "http://localhost:3000";
+const baseURL = "/api";
 
 interface RefreshResponse {
   access_token: string;

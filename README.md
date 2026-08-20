@@ -15,28 +15,6 @@ Este README é o documento principal do projeto. Conforme novas funcionalidades
 forem concluídas, ele será atualizado em vez de substituído por documentos
 separados.
 
-## Origem e construção do frontend
-
-As referências visuais e os HTMLs iniciais foram gerados com o Google Stitch.
-Esse material serviu como ponto de partida para o design, com aparência natural
-e próxima de uma interface construída para um produto real.
-
-A aplicação final não executa os HTMLs gerados. As telas foram analisadas e
-convertidas manualmente para React com TypeScript. Durante essa conversão:
-
-- o HTML foi dividido em páginas e componentes reutilizáveis;
-- comportamentos estáticos foram transformados em estado e hooks React;
-- as páginas receberam rotas com React Router;
-- os dados foram tipados com interfaces TypeScript;
-- animações e responsividade foram preservadas e refinadas;
-- chamadas HTTP foram centralizadas com Axios;
-- autenticação, cargos, paginação, filtros e estados de erro foram integrados;
-- o fluxo visual foi adaptado às regras reais do domínio de ingressos.
-
-Portanto, o Google Stitch foi utilizado como ferramenta de concepção visual,
-enquanto a estrutura, a componentização, a integração e a lógica em React foram
-implementadas manualmente no projeto.
-
 ## Tecnologias
 
 ### Frontend
@@ -66,7 +44,9 @@ implementadas manualmente no projeto.
 ```bash
 cd Backend
 npm install
+npx prisma migrate deploy
 npx prisma generate
+npx prisma db seed
 npm run start:dev
 ```
 
@@ -90,6 +70,10 @@ O frontend utiliza por padrão:
 http://localhost:5173
 ```
 
+Durante o desenvolvimento, o Frontend encaminha requisições iniciadas com
+`/api` para `http://localhost:3000`. Para testar a câmera em um celular, o
+Frontend pode ser exposto temporariamente por um endereço HTTPS do ngrok.
+
 ## Variáveis de ambiente
 
 Crie `Backend/.env` e configure:
@@ -105,6 +89,21 @@ PORT=3000
 
 Nunca publique o `.env`. `JWT_SECRET` e `JWT_REFRESH_SECRET` devem ser valores
 fortes e diferentes.
+
+## Dados de demonstração
+
+Execute `npx prisma db seed` dentro de `Backend` para criar os dados exigidos
+pelo desafio. Todas as contas usam a senha `Teste@123`.
+
+| Cargo | E-mail |
+| --- | --- |
+| Organizador | `organizador@vivae.test` |
+| Cliente 1 | `cliente1@vivae.test` |
+| Cliente 2 | `cliente2@vivae.test` |
+| Portaria | `portaria@vivae.test` |
+
+Também é criado o evento publicado `Sessão de Demonstração`, com ingresso de
+R$ 40,00 e mapa de 40 assentos.
 
 ## Autenticação
 
@@ -272,14 +271,14 @@ correto é posteriormente implementar cancelamento em vez de apagar o registro.
 O acesso a ingressos, assentos, checkout, resultado da compra e ingressos do
 usuário exige login.
 
-O `eventId` acompanha o fluxo:
+O `eventId` acompanha a seleção e o checkout. Depois do pagamento, o backend
+devolve o `ticketId` emitido:
 
 ```text
 /eventos/:id
   -> /ingressos?eventId=:id
   -> /checkout?eventId=:id
-  -> /sucesso?eventId=:id
-  -> /meus-ingressos
+  -> /sucesso?ticketId=:id
   -> /ingresso-digital?ticketId=:id
 ```
 
@@ -322,31 +321,48 @@ GET /tickets/my/:ticketId
 
 O backend obtém o usuário pelo `sub` do access token e sempre inclui `ownerId`
 na consulta. Dessa forma, não é possível consultar o ingresso de outra pessoa
-alterando o ID na URL. A listagem não devolve o `qrToken`; ele aparece somente
-na consulta individual protegida, que futuramente alimentará o QR Code real.
+alterando o ID na URL. A listagem não devolve os tokens; `qrToken` e `shareToken`
+aparecem somente na consulta individual protegida.
 
-Enquanto o fluxo de pagamento ainda não criar registros em `Ticket`, a página
-mostrará corretamente o estado vazio. Eventos externos, pedidos pendentes e
-pagamentos recusados não são ingressos e, portanto, não aparecem nessa tela.
+O QR Code contém o `qrToken` aleatório, enquanto o código curto `VIV-...` aparece
+abaixo dele como alternativa para digitação. A portaria aceita as duas formas.
+
+### Compartilhamento público
+
+O proprietário pode compartilhar uma URL criada com o `shareToken`:
+
+```text
+/ingresso-compartilhado/:shareToken
+```
+
+A página usa a rota pública abaixo, sem exigir que o destinatário tenha uma
+conta:
+
+```http
+GET /tickets/shared/:shareToken
+```
+
+O token é longo e aleatório e funciona como o segredo do link. O botão usa o
+compartilhamento nativo do navegador e copia a URL quando essa API não existe.
 
 ## Portaria
 
-A rota `/portaria` é exclusiva para `GATE_STAFF` e `ADMIN`. O fluxo abre
-diretamente o leitor e também permite digitar o código do ingresso.
+A rota `/portaria` é exclusiva no frontend para `GATE_STAFF` e `ADMIN`. O
+operador seleciona o evento atendido e pode ler o QR pela câmera ou digitar o
+código exibido no ingresso.
 
-O QR Code definitivo deverá carregar somente um identificador ou token
-assinado. O backend será responsável por conferir:
+O backend recebe o evento esperado e o código/token, consulta o ingresso e
+retorna um dos estados:
 
-- existência e assinatura;
-- evento e sessão;
-- validade;
-- cancelamento;
-- uso anterior;
-- permissão do operador.
+- `VALID`;
+- `INVALID`;
+- `ALREADY_USED`;
+- `WRONG_EVENT`;
+- `CANCELLED_TICKET`.
 
-A resposta de validação poderá informar evento, participante, tipo de ingresso,
-validade, status e motivo da recusa. Atualmente essa validação ainda é simulada
-no frontend.
+Uma validação aceita altera o ingresso para `USED` e grava uma auditoria em
+`TicketValidation`. Se o ingresso pertencer a outro evento, a tentativa também
+é registrada, mas o acesso é recusado com `WRONG_EVENT`.
 
 ## Módulos do backend
 
@@ -356,10 +372,6 @@ no frontend.
 | `users`          | Informações e cargos dos usuários          |
 | `catalog-events` | Integração com a Ticketmaster              |
 | `events`         | Eventos locais dos organizadores           |
-| `venues`         | Locais próprios do sistema                 |
-| `event-sessions` | Datas e sessões dos eventos                |
-| `ticketing`      | Tipos, lotes, preços e estoque             |
-| `seat-maps`      | Mapas e assentos                           |
 | `orders`         | Pedidos e seus itens                       |
 | `payments`       | Pagamentos simulados                       |
 | `tickets`        | Emissão e consulta de ingressos            |
@@ -370,10 +382,8 @@ no frontend.
 O schema Prisma modela:
 
 - usuários, cargos e status;
-- catálogo e eventos locais;
-- locais e sessões;
-- tipos, lotes e assentos;
-- equipe de evento;
+- eventos locais originados ou não dos catálogos externos;
+- tipos de ingresso e assentos;
 - pedidos e itens;
 - pagamentos simulados;
 - ingressos e validações.
@@ -399,19 +409,23 @@ Já funcionam ou estão integrados:
 - listagem pública somente de eventos locais publicados;
 - listagem dos eventos pertencentes ao organizador autenticado;
 - continuidade do evento no fluxo visual de compra;
+- reserva por quantidade e por assento com preços calculados no backend;
+- pagamento simulado com aprovação e recusa;
+- emissão de ingressos após pagamento aprovado;
 - consulta autenticada dos ingressos pertencentes ao usuário;
 - detalhe autenticado de um ingresso emitido;
+- QR Code real baseado em token aleatório;
+- compartilhamento público por link com `shareToken`;
 - dashboard do organizador;
-- interface de scanner e resultados de validação.
+- leitura real pela câmera e alternativa por digitação;
+- validação persistida com ingresso válido, inválido, já utilizado, cancelado
+  ou pertencente a outro evento.
 
-Ainda utilizam mocks ou precisam de persistência no backend:
+Antes da entrega final ainda podem ser melhorados:
 
-- importação definitiva de eventos;
-- dashboard e eventos do organizador;
-- sessões, setores, lotes e estoque;
-- pedidos e pagamento simulado;
-- emissão dos ingressos após a aprovação do pagamento;
-- leitura e validação real do QR Code.
+- autorização de cargos também nas rotas sensíveis do backend;
+- liberação automática de reservas abandonadas;
+- testes básicos dos principais fluxos.
 
 ## Validação do código
 

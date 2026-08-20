@@ -1,10 +1,12 @@
-import { useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
+import { QRCodeSVG } from "qrcode.react";
 import { AppHeader } from "../components/AppHeader";
 import { Icon } from "../components/Icon";
 import { images } from "../data/mockData";
 import { useMyTicket, useMyTickets } from "../hooks/useMyTickets";
 import type { MyTicket, TicketStatus } from "../types";
+import { getSharedTicket } from "../api/api";
 
 type TicketFilter = "ALL" | TicketStatus;
 
@@ -120,15 +122,28 @@ export function MyTicketsPage() {
 export function DigitalTicketPage() {
   const [searchParams] = useSearchParams();
   const { ticket, loading, error } = useMyTicket(searchParams.get("ticketId"));
+  const [shareMessage, setShareMessage] = useState("");
 
   async function shareTicket() {
-    if (!ticket || !navigator.share) return;
+    if (!ticket?.shareToken) return;
 
-    await navigator.share({
-      title: ticket.event.title,
-      text: `Ingresso ${ticket.code}`,
-      url: window.location.href,
-    });
+    const url = `${window.location.origin}/ingresso-compartilhado/${ticket.shareToken}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: ticket.event.title,
+          text: `Ingresso ${ticket.code}`,
+          url,
+        });
+        return;
+      } catch {
+        return;
+      }
+    }
+
+    await navigator.clipboard.writeText(url);
+    setShareMessage("Link copiado.");
   }
 
   if (loading) {
@@ -158,6 +173,7 @@ export function DigitalTicketPage() {
           <Icon>ios_share</Icon>
         </button>
       </header>
+      {shareMessage && <p className="ticket-hint">{shareMessage}</p>}
       <section className="digital-ticket">
         <img
           src={ticket.event.coverUrl ?? images.ticket}
@@ -176,9 +192,9 @@ export function DigitalTicketPage() {
           </p>
         </div>
         <div className="qr-placeholder">
-          <Icon>qr_code_2</Icon>
+          <QRCodeSVG value={ticket.qrToken ?? ticket.code} size={190} level="M" />
           <strong>{ticket.code}</strong>
-          <p>O QR Code será gerado a partir do token seguro deste ingresso.</p>
+          <p>Apresente este QR Code ou informe o código na portaria.</p>
         </div>
         <div className="ticket-meta">
           <span>
@@ -204,6 +220,64 @@ export function DigitalTicketPage() {
       <p className="ticket-hint">
         <Icon>info</Icon>Apresente este ingresso na entrada do evento.
       </p>
+    </main>
+  );
+}
+
+export function SharedTicketPage() {
+  const { shareToken = "" } = useParams();
+  const [ticket, setTicket] = useState<MyTicket | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    getSharedTicket(shareToken)
+      .then(setTicket)
+      .catch(() => setError("Este link de ingresso é inválido."));
+  }, [shareToken]);
+
+  if (error) {
+    return (
+      <main className="ticket-page ticket-state">
+        <h1>Ingresso indisponível</h1>
+        <p>{error}</p>
+        <Link className="button primary" to="/eventos">Ver eventos</Link>
+      </main>
+    );
+  }
+
+  if (!ticket) {
+    return <main className="ticket-page ticket-state">Carregando ingresso...</main>;
+  }
+
+  return (
+    <main className="ticket-page">
+      <header>
+        <Link to="/eventos" aria-label="Voltar"><Icon>arrow_back</Icon></Link>
+        <b>Ingresso compartilhado</b>
+        <span />
+      </header>
+      <section className="digital-ticket">
+        <img src={ticket.event.coverUrl ?? images.ticket} alt={ticket.event.title} />
+        <div className="ticket-info">
+          <small>{ticket.event.category}</small>
+          <h1>{ticket.event.title}</h1>
+          <p><Icon>calendar_today</Icon>{formatTicketDate(ticket.event.startsAt)}</p>
+          <p><Icon>location_on</Icon>{getVenue(ticket)}</p>
+        </div>
+        <div className="qr-placeholder">
+          <QRCodeSVG value={ticket.qrToken ?? ticket.code} size={190} level="M" />
+          <strong>{ticket.code}</strong>
+          <p>Apresente este QR Code ou informe o código na portaria.</p>
+        </div>
+        <div className="ticket-meta">
+          <span><small>PARTICIPANTE</small><b>{ticket.holderName}</b></span>
+          <span><small>INGRESSO</small><b>{ticket.ticketType.name}</b></span>
+          <span><small>STATUS</small><b>{statusLabels[ticket.status]}</b></span>
+          {ticket.seat && (
+            <span><small>ASSENTO</small><b>{ticket.seat.label}</b></span>
+          )}
+        </div>
+      </section>
     </main>
   );
 }

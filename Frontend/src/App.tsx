@@ -12,7 +12,7 @@ import {
   OrganizerEventsPage,
 } from "./pages/OrganizerPages";
 import { CheckoutPage, SeatsPage, SuccessPage } from "./pages/PurchasePages";
-import { DigitalTicketPage, MyTicketsPage } from "./pages/MyTicketsPages";
+import { DigitalTicketPage, MyTicketsPage, SharedTicketPage } from "./pages/MyTicketsPages";
 import {
   GateValidationResultPage,
   SmartScannerPage,
@@ -42,6 +42,7 @@ function App() {
         </Route>
         <Route path="/eventos" element={<EventsPage />} />
         <Route path="/eventos/:id" element={<EventDetailsPage />} />
+        <Route path="/ingresso-compartilhado/:shareToken" element={<SharedTicketPage />} />
         <Route element={<RoleProtectedRoute allowedRoles={authenticatedRoles} />}>
           <Route path="/ingressos" element={<TicketSelectionPage />} />
           <Route path="/assentos" element={<SeatsPage />} />

@@ -1374,6 +1374,22 @@ button {
   font-size: 17px;
   margin-bottom: 55px;
 }
+.gate-event-select {
+  width: min(420px, 90vw);
+  display: grid;
+  gap: 8px;
+  margin-bottom: 24px;
+  color: #fff;
+  font-weight: 700;
+}
+.gate-event-select select {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #ffffff55;
+  border-radius: 8px;
+  background: #182337;
+  color: #fff;
+}
 .scanner-frame {
   width: 270px;
   height: 270px;
@@ -1381,6 +1397,37 @@ button {
   background: transparent;
   border: 1px solid #ffffff44;
   border-radius: 8px;
+  overflow: hidden;
+}
+.scanner-frame video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.camera-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #111a2bb3;
+}
+.camera-placeholder .material-symbols-outlined {
+  font-size: 64px;
+  color: #d9e4ff;
+}
+.camera-permission {
+  margin-top: 30px;
+}
+.camera-message {
+  max-width: 340px;
+  margin: 22px 0 0;
+  text-align: center;
+  color: #d9e4ff;
+}
+.camera-message.error {
+  color: #ffd5d2;
 }
 .corner {
   position: absolute;

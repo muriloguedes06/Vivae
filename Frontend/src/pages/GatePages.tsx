@@ -1,12 +1,15 @@
-import { useState } from "react";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Icon } from "../components/Icon";
 import { images } from "../data/mockData";
 import { useScanner } from "../hooks/useScanner";
+import { useMobileDevice } from "../hooks/useMobileDevice";
+import { validateTicket } from "../api/api";
+import { usePublishedEvents } from "../hooks/useLocalEvents";
 
 interface GateValidationResult {
   valid: boolean;
-  status: "VALID" | "EXPIRED" | "ALREADY_USED" | "INVALID";
+  status: "VALID" | "ALREADY_USED" | "INVALID" | "CANCELLED_TICKET" | "WRONG_EVENT";
   message: string;
   eventName?: string;
   participantName?: string;
@@ -15,63 +18,51 @@ interface GateValidationResult {
   code: string;
 }
 
-function simulateValidation(code: string): GateValidationResult {
-  const normalizedCode = code.trim().toUpperCase();
-
-  if (normalizedCode.includes("EXPIRADO")) {
-    return {
-      valid: false,
-      status: "EXPIRED",
-      message: "Este ingresso passou da data de validade.",
-      eventName: "Festival Vivaê 2026",
-      expiresAt: "18/08/2026 às 23:59",
-      code,
-    };
-  }
-
-  if (normalizedCode.includes("USADO")) {
-    return {
-      valid: false,
-      status: "ALREADY_USED",
-      message: "Este ingresso já foi utilizado na portaria.",
-      eventName: "Festival Vivaê 2026",
-      participantName: "Mariana Costa",
-      code,
-    };
-  }
-
-  if (!normalizedCode || normalizedCode.includes("INVALIDO")) {
-    return {
-      valid: false,
-      status: "INVALID",
-      message: "Código não encontrado ou assinatura inválida.",
-      code,
-    };
-  }
-
-  return {
-    valid: true,
-    status: "VALID",
-    message: "Acesso liberado.",
-    eventName: "Festival Vivaê 2026",
-    participantName: "Mariana Costa",
-    ticketType: "Pista Premium",
-    expiresAt: "19/08/2026 às 23:59",
-    code,
-  };
-}
-
 export function SmartScannerPage() {
-  const { scanned, flashlight, toggleFlashlight } = useScanner();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { events, loading: loadingEvents } = usePublishedEvents();
+  const [eventId, setEventId] = useState(searchParams.get("eventId") ?? "");
   const [manualMode, setManualMode] = useState(false);
   const [code, setCode] = useState("");
+  const [validationError, setValidationError] = useState("");
+  const [validating, setValidating] = useState(false);
+  const isMobileDevice = useMobileDevice();
+  const {
+    videoRef,
+    status,
+    scannedCode,
+    flashlight,
+    decoderAvailable,
+    startCamera,
+    toggleFlashlight,
+  } = useScanner(isMobileDevice && !manualMode && Boolean(eventId));
 
-  function validateCode(value: string) {
-    navigate("/portaria/resultado", {
-      state: { result: simulateValidation(value) },
-    });
-  }
+  const validateCode = useCallback(async (value: string) => {
+    if (!value.trim() || !eventId) {
+      setValidationError("Selecione o evento antes de validar.");
+      return;
+    }
+
+    setValidating(true);
+    setValidationError("");
+    try {
+      const result = await validateTicket(value, eventId);
+      navigate("/portaria/resultado", { state: { result, eventId } });
+    } catch {
+      setValidationError("Não foi possível validar o ingresso.");
+      setValidating(false);
+    }
+  }, [eventId, navigate]);
+
+  useEffect(() => {
+    if (!scannedCode) return;
+
+    const validation = window.setTimeout(() => void validateCode(scannedCode), 0);
+    return () => window.clearTimeout(validation);
+  }, [scannedCode, validateCode]);
+
+  const showManualForm = !isMobileDevice || manualMode;
 
   return (
     <main
@@ -90,30 +81,62 @@ export function SmartScannerPage() {
         </Link>
       </header>
       <section>
-        <p>Aponte a câmera para o QR Code do ingresso</p>
-        <button
-          aria-label="Simular leitura do QR Code"
-          onClick={() => validateCode("VIVAE-DEMO-2026")}
-          className={`scanner-frame ${scanned ? "scanned" : ""}`}
-        >
-          <i className="corner top-left" />
-          <i className="corner top-right" />
-          <i className="corner bottom-left" />
-          <i className="corner bottom-right" />
-          <span className="scan-line" />
-          {scanned && (
-            <span className="scan-success">
-              <Icon>qr_code_scanner</Icon>
-            </span>
-          )}
-        </button>
+        <label className="gate-event-select">
+          Evento desta portaria
+          <select
+            value={eventId}
+            onChange={(event) => setEventId(event.target.value)}
+            disabled={loadingEvents || validating}
+          >
+            <option value="">{loadingEvents ? "Carregando eventos..." : "Selecione o evento"}</option>
+            {events.map((event) => (
+              <option key={event.id} value={event.id}>{event.title}</option>
+            ))}
+          </select>
+        </label>
 
-        {manualMode && (
+        {isMobileDevice && !manualMode && (
+          <>
+            <p>Aponte a câmera traseira para o QR Code do ingresso.</p>
+            <div className={`scanner-frame ${status === "active" ? "camera-active" : ""}`}>
+              <video ref={videoRef} muted playsInline aria-label="Imagem da câmera" />
+              <i className="corner top-left" />
+              <i className="corner top-right" />
+              <i className="corner bottom-left" />
+              <i className="corner bottom-right" />
+              {status === "active" && <span className="scan-line" />}
+              {status !== "active" && (
+                <span className="camera-placeholder"><Icon>photo_camera</Icon></span>
+              )}
+            </div>
+
+            {status === "idle" && eventId && (
+              <button className="button primary camera-permission" onClick={() => void startCamera()}>
+                <Icon>photo_camera</Icon>Permitir câmera
+              </button>
+            )}
+            {status === "requesting" && <p className="camera-message">Aguardando permissão...</p>}
+            {status === "denied" && (
+              <p className="camera-message error">Permissão negada. Libere a câmera nas configurações do navegador ou digite o código.</p>
+            )}
+            {status === "unsupported" && (
+              <p className="camera-message error">Este navegador não disponibiliza acesso à câmera.</p>
+            )}
+            {status === "error" && (
+              <p className="camera-message error">Não foi possível abrir a câmera. Verifique se ela está sendo usada por outro aplicativo.</p>
+            )}
+            {status === "active" && !decoderAvailable && (
+              <p className="camera-message error">A câmera abriu, mas este navegador não possui leitor QR nativo. Use a digitação manual.</p>
+            )}
+          </>
+        )}
+
+        {showManualForm && (
           <form
             className="manual-code-form"
             onSubmit={(event) => {
               event.preventDefault();
-              validateCode(code);
+              void validateCode(code);
             }}
           >
             <label htmlFor="ticket-code">Código do ingresso</label>
@@ -125,32 +148,34 @@ export function SmartScannerPage() {
                 placeholder="Ex.: VIVAE-A1B2C3"
                 autoFocus
               />
-              <button className="button primary" type="submit">
-                Validar
+              <button className="button primary" type="submit" disabled={validating}>
+                {validating ? "Validando..." : "Validar"}
               </button>
             </div>
             <small>
-              Para testar recusas, use “EXPIRADO”, “USADO” ou “INVALIDO”.
+              Digite o código exibido abaixo do QR Code do ingresso.
             </small>
+            {validationError && <p className="camera-message error">{validationError}</p>}
           </form>
         )}
 
-        <div className="scanner-controls">
-          <button
-            className={`flash-button ${flashlight ? "active" : ""}`}
-            onClick={toggleFlashlight}
-            aria-label="Alternar lanterna"
-          >
-            <Icon>{flashlight ? "flashlight_off" : "flashlight_on"}</Icon>
-          </button>
-          <button
-            className="manual-button"
-            onClick={() => setManualMode((current) => !current)}
-          >
-            <Icon>{manualMode ? "qr_code_scanner" : "keyboard"}</Icon>
-            {manualMode ? "Voltar ao leitor" : "Digitar código"}
-          </button>
-        </div>
+        {isMobileDevice && (
+          <div className="scanner-controls">
+            {status === "active" && !manualMode && (
+              <button
+                className={`flash-button ${flashlight ? "active" : ""}`}
+                onClick={() => void toggleFlashlight()}
+                aria-label="Alternar lanterna"
+              >
+                <Icon>{flashlight ? "flashlight_off" : "flashlight_on"}</Icon>
+              </button>
+            )}
+            <button className="manual-button" onClick={() => setManualMode((current) => !current)}>
+              <Icon>{manualMode ? "qr_code_scanner" : "keyboard"}</Icon>
+              {manualMode ? "Voltar ao leitor" : "Digitar código"}
+            </button>
+          </div>
+        )}
       </section>
     </main>
   );
@@ -160,6 +185,7 @@ export function GateValidationResultPage() {
   const location = useLocation();
   const result = (location.state as { result?: GateValidationResult } | null)
     ?.result;
+  const eventId = (location.state as { eventId?: string } | null)?.eventId;
 
   if (!result) {
     return <Navigate to="/portaria" replace />;
@@ -195,7 +221,7 @@ export function GateValidationResultPage() {
             </span>
             <span>
               <small>VALIDADE</small>
-              <b>{result.expiresAt ?? "Não informada"}</b>
+              <b>{result.expiresAt ? new Date(result.expiresAt).toLocaleString("pt-BR") : "Não informada"}</b>
             </span>
             <span>
               <small>STATUS</small>
@@ -204,7 +230,10 @@ export function GateValidationResultPage() {
           </div>
           <small className="validation-code">CÓDIGO: {result.code}</small>
         </article>
-        <Link className="button primary wide" to="/portaria">
+        <Link
+          className="button primary wide"
+          to={`/portaria${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`}
+        >
           Validar próximo ingresso
         </Link>
       </section>

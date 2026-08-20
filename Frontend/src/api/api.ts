@@ -104,15 +104,69 @@ export async function deleteLocalEvent(id: string) {
     await api.delete(`/events/${encodeURIComponent(id)}`);
 }
 
+interface CreateOrderInput {
+    eventId: string;
+    items: Array<{
+        ticketTypeId: string;
+        quantity?: number;
+        seatIds?: string[];
+    }>;
+}
+
+interface CreatedOrder {
+    id: string;
+    code: string;
+    status: 'PENDING';
+    total: string;
+}
+
+interface SimulatePaymentInput {
+    orderId: string;
+    cardholderName: string;
+    cardNumber: string;
+    expiry: string;
+    cvv: string;
+}
+
+interface SimulatedPaymentResponse {
+    approved: boolean;
+    tickets: Array<{
+        id: string;
+    }>;
+}
+
+export async function createOrder(data: CreateOrderInput) {
+    const response = await api.post<CreatedOrder>('/orders', data);
+    return response.data;
+}
+
+export async function simulatePayment(data: SimulatePaymentInput) {
+    const response = await api.post<SimulatedPaymentResponse>('/payments/simulate', data);
+    return response.data;
+}
+
 export async function getMyTickets() {
     const response = await api.get<MyTicket[]>('/tickets/my');
 
     return response.data;
 }
 
+export async function validateTicket(code: string, eventId: string) {
+    const response = await api.post('/gate/validate', { code, eventId });
+    return response.data;
+}
+
 export async function getMyTicket(id: string) {
     const response = await api.get<MyTicket>(
         `/tickets/my/${encodeURIComponent(id)}`,
+    );
+
+    return response.data;
+}
+
+export async function getSharedTicket(shareToken: string) {
+    const response = await api.get<MyTicket>(
+        `/tickets/shared/${encodeURIComponent(shareToken)}`,
     );
 
     return response.data;
