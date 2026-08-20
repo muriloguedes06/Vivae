@@ -3,6 +3,16 @@
 Plataforma de eventos com catálogo externo, organização de eventos, compra
 simulada de ingressos e validação de entrada por QR Code.
 
+## Layout
+
+### Eventos publicados
+
+![Página de eventos publicados](./Frontend/public/eventos.png)
+
+### Painel do organizador
+
+![Painel do organizador](./Frontend/public/Organizador.png)
+
 O repositório é dividido em:
 
 ```text
