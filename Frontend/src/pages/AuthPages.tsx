@@ -38,7 +38,7 @@ export function LoginPage() {
       })
       setLoginMessage(response.message);
       localStorage.setItem('accessToken', response.access_token);
-      localStorage.setItem('refreshToken', response.refresh_token);
+      localStorage.removeItem('refreshToken');
       const { user } = await getCurrentUser();
       localStorage.setItem('user', JSON.stringify(user));
       setLoading(false);

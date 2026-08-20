@@ -24,12 +24,7 @@ import type { UserRole } from "./types";
 
 const organizerRoles: UserRole[] = ["ORGANIZER", "ADMIN"];
 const gateRoles: UserRole[] = ["GATE_STAFF", "ADMIN"];
-const authenticatedRoles: UserRole[] = [
-  "CUSTOMER",
-  "ORGANIZER",
-  "GATE_STAFF",
-  "ADMIN",
-];
+const customerRoles: UserRole[] = ["CUSTOMER", "ADMIN"];
 
 function App() {
   return (
@@ -43,7 +38,7 @@ function App() {
         <Route path="/eventos" element={<EventsPage />} />
         <Route path="/eventos/:id" element={<EventDetailsPage />} />
         <Route path="/ingresso-compartilhado/:shareToken" element={<SharedTicketPage />} />
-        <Route element={<RoleProtectedRoute allowedRoles={authenticatedRoles} />}>
+        <Route element={<RoleProtectedRoute allowedRoles={customerRoles} />}>
           <Route path="/ingressos" element={<TicketSelectionPage />} />
           <Route path="/assentos" element={<SeatsPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />

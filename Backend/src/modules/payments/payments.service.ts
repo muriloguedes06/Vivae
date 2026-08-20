@@ -158,7 +158,7 @@ export class PaymentsService {
                   eventId: order.eventId,
                   ticketTypeId: item.ticketTypeId,
                   seatId: item.seatId,
-                  code: `VIV-${randomUUID().slice(0, 8).toUpperCase()}`,
+                  code: `VIV-${randomUUID().replaceAll('-', '').slice(0, 16).toUpperCase()}`,
                   qrToken: randomBytes(32).toString('base64url'),
                   shareToken: randomBytes(32).toString('base64url'),
                   holderName:

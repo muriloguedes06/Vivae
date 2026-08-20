@@ -7,15 +7,18 @@ const baseURL = "/api";
 
 interface RefreshResponse {
   access_token: string;
-  refresh_token: string;
+}
+
+export async function logoutSession() {
+  await refreshClient.post("/auth/logout");
 }
 
 interface RetryableRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
 }
 
-export const api = axios.create({ baseURL });
-const refreshClient = axios.create({ baseURL });
+export const api = axios.create({ baseURL, withCredentials: true });
+const refreshClient = axios.create({ baseURL, withCredentials: true });
 let refreshPromise: Promise<string> | null = null;
 
 function clearSession() {
@@ -25,18 +28,9 @@ function clearSession() {
 }
 
 async function renewAccessToken() {
-  const refreshToken = localStorage.getItem("refreshToken");
-
-  if (!refreshToken) {
-    throw new Error("Refresh token não encontrado.");
-  }
-
-  const response = await refreshClient.post<RefreshResponse>("/auth/refresh", {
-    refresh_token: refreshToken,
-  });
+  const response = await refreshClient.post<RefreshResponse>("/auth/refresh");
 
   localStorage.setItem("accessToken", response.data.access_token);
-  localStorage.setItem("refreshToken", response.data.refresh_token);
 
   return response.data.access_token;
 }

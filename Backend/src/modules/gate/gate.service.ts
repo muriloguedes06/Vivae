@@ -117,12 +117,34 @@ export class GateService {
       };
     }
 
-    await this.prisma.$transaction([
-      this.prisma.ticket.update({
-        where: { id: ticket.id },
-        data: { status: 'USED', usedAt: new Date() },
-      }),
-      this.prisma.ticketValidation.create({
+    const consumed = await this.prisma.$transaction(async (transaction) => {
+      const update = await transaction.ticket.updateMany({
+        where: {
+          id: ticket.id,
+          status: 'ACTIVE',
+        },
+        data: {
+          status: 'USED',
+          usedAt: new Date(),
+        },
+      });
+
+      if (update.count === 0) {
+        await transaction.ticketValidation.create({
+          data: {
+            eventId: ticket.eventId,
+            ticketId: ticket.id,
+            operatorId,
+            scannedCode: normalizedCode,
+            status: 'ALREADY_USED',
+            reason: 'Ingresso já utilizado.',
+          },
+        });
+
+        return false;
+      }
+
+      await transaction.ticketValidation.create({
         data: {
           eventId: ticket.eventId,
           ticketId: ticket.id,
@@ -130,8 +152,23 @@ export class GateService {
           scannedCode: normalizedCode,
           status: 'VALID',
         },
-      }),
-    ]);
+      });
+
+      return true;
+    });
+
+    if (!consumed) {
+      return {
+        valid: false,
+        status: 'ALREADY_USED',
+        message: 'Este ingresso já foi utilizado.',
+        eventName: ticket.event.title,
+        participantName: ticket.holderName,
+        ticketType: ticket.ticketType.name,
+        expiresAt: ticket.event.endsAt ?? ticket.event.startsAt,
+        code: ticket.code,
+      };
+    }
 
     return {
       valid: true,

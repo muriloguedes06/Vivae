@@ -2,6 +2,7 @@ import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { Icon } from "./Icon";
 import type { UserRole } from "../types";
+import { logoutSession } from "../api/connect";
 
 export function Logo() {
   return (
@@ -28,12 +29,15 @@ export function AppHeader({ onSearch }: AppHeaderProps) {
       })
     : null;
 
-  function logout() {
+  async function logout() {
+    try {
+      await logoutSession();
+    } finally {
     localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
     localStorage.removeItem("user");
     setMenuOpen(false);
     navigate("/login");
+    }
   }
 
   function submitSearch(event: React.FormEvent<HTMLFormElement>) {
@@ -92,7 +96,7 @@ export function AppHeader({ onSearch }: AppHeaderProps) {
                 {(user.role === "GATE_STAFF" || user.role === "ADMIN") && (
                   <NavLink to="/portaria">Acessar portaria</NavLink>
                 )}
-                <button type="button" onClick={logout}>
+                <button type="button" onClick={() => void logout()}>
                   Sair
                 </button>
               </>

@@ -11,25 +11,26 @@ import {
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth-guard';
 import { OrdersService } from './orders.service';
-import type { CreateOrderInput } from './orders.service';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
+import { CreateOrderDto } from './order.dto';
 
 @Controller('orders')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('CUSTOMER', 'ADMIN')
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Post()
   create(
     @Req() request: Request & { user?: { sub: string } },
-    @Body() input: CreateOrderInput,
+    @Body() input: CreateOrderDto,
   ) {
     return this.ordersService.create(request.user!.sub, input);
   }
 
   @Get('my')
-  findMine(
-    @Req() request: Request & { user?: { sub: string } },
-  ) {
+  findMine(@Req() request: Request & { user?: { sub: string } }) {
     return this.ordersService.findMine(request.user!.sub);
   }
 

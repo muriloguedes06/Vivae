@@ -1,7 +1,20 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { Icon } from "./Icon";
+import { logoutSession } from "../api/connect";
 
 export function OrganizerSidebar() {
+  const navigate = useNavigate();
+
+  async function logout() {
+    try {
+      await logoutSession();
+    } finally {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("user");
+      navigate("/login");
+    }
+  }
+
   const items = [
     ["dashboard", "Dashboard", "/organizador"],
     ["calendar_month", "Eventos", "/organizador/eventos"],
@@ -28,9 +41,9 @@ export function OrganizerSidebar() {
         <a href="#help">
           <Icon>help</Icon>Central de ajuda
         </a>
-        <NavLink to="/login">
+        <button type="button" onClick={() => void logout()}>
           <Icon>logout</Icon>Logout
-        </NavLink>
+        </button>
       </footer>
     </aside>
   );

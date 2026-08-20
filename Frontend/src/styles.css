@@ -982,12 +982,19 @@ button {
   gap: 8px;
   margin-top: 45px;
 }
-.organizer-sidebar a {
+.organizer-sidebar a,
+.organizer-sidebar footer button {
   display: flex;
   align-items: center;
   gap: 20px;
   padding: 15px 20px;
   border-radius: 5px;
+}
+.organizer-sidebar footer button {
+  width: 100%;
+  color: inherit;
+  background: transparent;
+  border: 0;
 }
 .organizer-sidebar a.active {
   background: var(--primary);

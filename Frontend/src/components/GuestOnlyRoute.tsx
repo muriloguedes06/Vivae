@@ -17,7 +17,7 @@ const homeByRole: Record<UserRole, string> = {
 
 export function GuestOnlyRoute() {
   const hasToken = Boolean(
-    localStorage.getItem("accessToken") || localStorage.getItem("refreshToken"),
+    localStorage.getItem("accessToken"),
   );
   const [status, setStatus] = useState<GuestStatus>(() =>
     hasToken ? { state: "checking" } : { state: "guest" },
@@ -33,7 +33,6 @@ export function GuestOnlyRoute() {
         setStatus({ state: "authenticated", role: user.role });
       } catch {
         localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
         localStorage.removeItem("user");
         setStatus({ state: "guest" });
       }

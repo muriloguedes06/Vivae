@@ -27,7 +27,6 @@ export function RoleProtectedRoute({ allowedRoles }: RoleProtectedRouteProps) {
         setStatus(allowedRoles.includes(user.role) ? "allowed" : "forbidden");
       } catch {
         localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
         localStorage.removeItem("user");
         setStatus("unauthenticated");
       }

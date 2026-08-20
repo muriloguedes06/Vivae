@@ -6,7 +6,9 @@ import {
 } from '@nestjs/common';
 
 import { JwtService } from '@nestjs/jwt';
+import type { UserRole } from '@prisma/client';
 import type { Request } from 'express';
+import { PrismaService } from '../../prisma/prisma.service';
 
 interface AccessTokenPayload {
   sub: string;
@@ -15,12 +17,15 @@ interface AccessTokenPayload {
 }
 
 interface AuthenticatedRequest extends Request {
-  user?: Express.User & AccessTokenPayload;
+  user?: Express.User & AccessTokenPayload & { role: UserRole };
 }
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
@@ -41,11 +46,24 @@ export class JwtAuthGuard implements CanActivate {
       const payload =
         await this.jwtService.verifyAsync<AccessTokenPayload>(token);
 
-      request.user = payload;
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.sub },
+        select: { role: true, status: true },
+      });
+
+      if (!user || user.status !== 'ACTIVE') {
+        throw new UnauthorizedException('Usuário não está ativo.');
+      }
+
+      request.user = { ...payload, role: user.role };
 
       return true;
-    } catch {
-      throw new UnauthorizedException('TOken inválido ou expirado.');
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+
+      throw new UnauthorizedException('Token inválido ou expirado.');
     }
   }
 }

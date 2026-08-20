@@ -33,8 +33,8 @@ export class AuthService {
     const fields = {
       username: username.trim(),
       lastname: lastname.trim(),
-      email: email.trim(),
-      password: password.trim(),
+      email: email.trim().toLowerCase(),
+      password,
     };
 
     if (Object.values(fields).some((value) => !value)) {
@@ -57,8 +57,8 @@ export class AuthService {
         'Email inválido.',
       ],
       [
-        fields.password.length >= 6,
-        'A senha deve conter no minimo 6 caracters',
+        fields.password.length >= 8,
+        'A senha deve conter no mínimo 8 caracteres.',
       ],
     ];
 
@@ -70,16 +70,16 @@ export class AuthService {
 
     const existingUser = await this.prisma.user.findFirst({
       where: {
-        OR: [{ username }, { email }],
+        OR: [{ username: fields.username }, { email: fields.email }],
       },
     });
 
     if (existingUser) {
-      if (existingUser.username === username) {
+      if (existingUser.username === fields.username) {
         throw new ConflictException('Este username já está em uso.');
       }
 
-      if (existingUser.email === email) {
+      if (existingUser.email === fields.email) {
         throw new ConflictException('Este email já está em uso.');
       }
 
@@ -87,13 +87,13 @@ export class AuthService {
     }
 
     const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    const hashedPassword = await bcrypt.hash(fields.password, saltRounds);
 
     const user = await this.prisma.user.create({
       data: {
-        username,
-        lastname,
-        email,
+        username: fields.username,
+        lastname: fields.lastname,
+        email: fields.email,
         password: hashedPassword,
       },
     });
@@ -112,8 +112,7 @@ export class AuthService {
     if (!email || !password) {
       throw new BadRequestException('Email e senha são obrigatorios.');
     }
-    email = email.trim();
-    password = password.trim();
+    email = email.trim().toLowerCase();
 
     if (!email || !password) {
       throw new BadRequestException('Email e senha são obrigatorios.');
@@ -127,6 +126,10 @@ export class AuthService {
 
     if (!user) {
       throw new UnauthorizedException('Email ou senha inválidos.');
+    }
+
+    if (user.status !== 'ACTIVE') {
+      throw new UnauthorizedException('Usuário não está ativo.');
     }
 
     const isValidPassword = await bcrypt.compare(password, user.password);
