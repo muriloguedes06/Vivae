@@ -140,7 +140,9 @@ export class CatalogEventsService {
   private async fetchTmdb<T>(url: URL): Promise<T> {
     const token = process.env.THE_MOVIE_DB_CONSUMER_KEY;
     if (!token) {
-      throw new InternalServerErrorException('O token da TMDb não foi configurado.');
+      throw new InternalServerErrorException(
+        'O token da TMDb não foi configurado.',
+      );
     }
     const response = await fetch(url, {
       headers: {
@@ -149,7 +151,9 @@ export class CatalogEventsService {
       },
     });
     if (!response.ok) {
-      throw new BadGatewayException(`A TMDb respondeu com o status ${response.status}.`);
+      throw new BadGatewayException(
+        `A TMDb respondeu com o status ${response.status}.`,
+      );
     }
     return (await response.json()) as T;
   }
@@ -157,8 +161,12 @@ export class CatalogEventsService {
   private withTmdbImages(movie: TmdbMovie) {
     return {
       ...movie,
-      posterUrl: movie.poster_path ? `${this.tmdbImageBaseUrl}${movie.poster_path}` : null,
-      backdropUrl: movie.backdrop_path ? `${this.tmdbImageBaseUrl}${movie.backdrop_path}` : null,
+      posterUrl: movie.poster_path
+        ? `${this.tmdbImageBaseUrl}${movie.poster_path}`
+        : null,
+      backdropUrl: movie.backdrop_path
+        ? `${this.tmdbImageBaseUrl}${movie.backdrop_path}`
+        : null,
     };
   }
 

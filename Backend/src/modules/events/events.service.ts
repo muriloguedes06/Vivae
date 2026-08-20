@@ -54,8 +54,18 @@ export class EventsService {
         ...(normalizedQuery
           ? {
               OR: [
-                { title: { contains: normalizedQuery, mode: 'insensitive' as const } },
-                { city: { contains: normalizedQuery, mode: 'insensitive' as const } },
+                {
+                  title: {
+                    contains: normalizedQuery,
+                    mode: 'insensitive' as const,
+                  },
+                },
+                {
+                  city: {
+                    contains: normalizedQuery,
+                    mode: 'insensitive' as const,
+                  },
+                },
               ],
             }
           : {}),
@@ -91,7 +101,8 @@ export class EventsService {
       where: { id, organizerId },
       include: eventInclude,
     });
-    if (!event) throw new NotFoundException('Evento do organizador não encontrado.');
+    if (!event)
+      throw new NotFoundException('Evento do organizador não encontrado.');
     return this.toResponse(event);
   }
 
@@ -102,18 +113,38 @@ export class EventsService {
     const ticketTypes = input.ticketTypes ?? [];
     this.validateSeatMap(input);
 
-    if (!input.title?.trim() || !input.description?.trim() || !input.venueName?.trim() ||
-      !input.address?.trim() || !input.city?.trim() || !input.state?.trim() ||
-      Number.isNaN(startsAt.getTime())) {
-      throw new BadRequestException('Preencha os dados obrigatórios do evento.');
+    if (
+      !input.title?.trim() ||
+      !input.description?.trim() ||
+      !input.venueName?.trim() ||
+      !input.address?.trim() ||
+      !input.city?.trim() ||
+      !input.state?.trim() ||
+      Number.isNaN(startsAt.getTime())
+    ) {
+      throw new BadRequestException(
+        'Preencha os dados obrigatórios do evento.',
+      );
     }
     if (endsAt && (Number.isNaN(endsAt.getTime()) || endsAt <= startsAt)) {
-      throw new BadRequestException('O término deve acontecer depois do início.');
+      throw new BadRequestException(
+        'O término deve acontecer depois do início.',
+      );
     }
-    if (ticketTypes.length === 0 || ticketTypes.some((type) =>
-      !type.name?.trim() || !Number.isFinite(Number(type.price)) || Number(type.price) <= 0 ||
-      !Number.isInteger(Number(type.capacity)) || Number(type.capacity) <= 0)) {
-      throw new BadRequestException('Informe ao menos um tipo com preço e capacidade positivos.');
+    if (
+      ticketTypes.length === 0 ||
+      ticketTypes.some(
+        (type) =>
+          !type.name?.trim() ||
+          !Number.isFinite(Number(type.price)) ||
+          Number(type.price) <= 0 ||
+          !Number.isInteger(Number(type.capacity)) ||
+          Number(type.capacity) <= 0,
+      )
+    ) {
+      throw new BadRequestException(
+        'Informe ao menos um tipo com preço e capacidade positivos.',
+      );
     }
 
     try {
@@ -142,16 +173,24 @@ export class EventsService {
               capacity: Number(type.capacity),
             })),
           },
-          seats: input.ticketingMode === 'RESERVED_SEATING' && input.seatMap
-            ? { create: this.buildSeats(input.seatMap.rows, input.seatMap.columns) }
-            : undefined,
+          seats:
+            input.ticketingMode === 'RESERVED_SEATING' && input.seatMap
+              ? {
+                  create: this.buildSeats(
+                    input.seatMap.rows,
+                    input.seatMap.columns,
+                  ),
+                }
+              : undefined,
         },
         include: eventInclude,
       });
       return this.toResponse(event);
     } catch (error) {
       if (this.isUniqueConstraintError(error)) {
-        throw new ConflictException('Este evento do catálogo já foi importado pelo organizador.');
+        throw new ConflictException(
+          'Este evento do catálogo já foi importado pelo organizador.',
+        );
       }
       throw error;
     }
@@ -163,7 +202,8 @@ export class EventsService {
       where: { id, organizerId },
       include: eventInclude,
     });
-    if (!event) throw new NotFoundException('Evento do organizador não encontrado.');
+    if (!event)
+      throw new NotFoundException('Evento do organizador não encontrado.');
     if (event.ticketTypes.length === 0) {
       throw new BadRequestException('Configure ingressos antes de publicar.');
     }
@@ -181,9 +221,14 @@ export class EventsService {
       where: { id, organizerId },
       include: eventInclude,
     });
-    if (!current) throw new NotFoundException('Evento do organizador não encontrado.');
-    if (current.ticketTypes.some((type) => type.sold > 0 || type.reserved > 0)) {
-      throw new ConflictException('Não é possível alterar ingressos depois do início das vendas.');
+    if (!current)
+      throw new NotFoundException('Evento do organizador não encontrado.');
+    if (
+      current.ticketTypes.some((type) => type.sold > 0 || type.reserved > 0)
+    ) {
+      throw new ConflictException(
+        'Não é possível alterar ingressos depois do início das vendas.',
+      );
     }
 
     const startsAt = new Date(input.startsAt);
@@ -215,9 +260,15 @@ export class EventsService {
               capacity: Number(type.capacity),
             })),
           },
-          seats: input.ticketingMode === 'RESERVED_SEATING' && input.seatMap
-            ? { create: this.buildSeats(input.seatMap.rows, input.seatMap.columns) }
-            : undefined,
+          seats:
+            input.ticketingMode === 'RESERVED_SEATING' && input.seatMap
+              ? {
+                  create: this.buildSeats(
+                    input.seatMap.rows,
+                    input.seatMap.columns,
+                  ),
+                }
+              : undefined,
         },
         include: eventInclude,
       });
@@ -229,11 +280,20 @@ export class EventsService {
     await this.assertOrganizer(organizerId);
     const event = await this.prisma.event.findFirst({
       where: { id, organizerId },
-      include: { _count: { select: { orders: true, tickets: true, validations: true } } },
+      include: {
+        _count: { select: { orders: true, tickets: true, validations: true } },
+      },
     });
-    if (!event) throw new NotFoundException('Evento do organizador não encontrado.');
-    if (event._count.orders || event._count.tickets || event._count.validations) {
-      throw new ConflictException('Eventos com pedidos, ingressos ou validações não podem ser excluídos.');
+    if (!event)
+      throw new NotFoundException('Evento do organizador não encontrado.');
+    if (
+      event._count.orders ||
+      event._count.tickets ||
+      event._count.validations
+    ) {
+      throw new ConflictException(
+        'Eventos com pedidos, ingressos ou validações não podem ser excluídos.',
+      );
     }
     await this.prisma.event.delete({ where: { id } });
     return { message: 'Evento excluído com sucesso.' };
@@ -244,9 +304,14 @@ export class EventsService {
       where: { id: userId },
       select: { role: true, status: true },
     });
-    if (!user || user.status !== 'ACTIVE' ||
-      (user.role !== 'ORGANIZER' && user.role !== 'ADMIN')) {
-      throw new ForbiddenException('Apenas organizadores ativos podem gerenciar eventos.');
+    if (
+      !user ||
+      user.status !== 'ACTIVE' ||
+      (user.role !== 'ORGANIZER' && user.role !== 'ADMIN')
+    ) {
+      throw new ForbiddenException(
+        'Apenas organizadores ativos podem gerenciar eventos.',
+      );
     }
   }
 
@@ -255,15 +320,33 @@ export class EventsService {
     startsAt: Date,
     ticketTypes: CreateTicketTypeInput[],
   ) {
-    if (!input.title?.trim() || !input.description?.trim() || !input.venueName?.trim() ||
-      !input.address?.trim() || !input.city?.trim() || !input.state?.trim() ||
-      Number.isNaN(startsAt.getTime())) {
-      throw new BadRequestException('Preencha os dados obrigatórios do evento.');
+    if (
+      !input.title?.trim() ||
+      !input.description?.trim() ||
+      !input.venueName?.trim() ||
+      !input.address?.trim() ||
+      !input.city?.trim() ||
+      !input.state?.trim() ||
+      Number.isNaN(startsAt.getTime())
+    ) {
+      throw new BadRequestException(
+        'Preencha os dados obrigatórios do evento.',
+      );
     }
-    if (ticketTypes.length === 0 || ticketTypes.some((type) =>
-      !type.name?.trim() || !Number.isFinite(Number(type.price)) || Number(type.price) <= 0 ||
-      !Number.isInteger(Number(type.capacity)) || Number(type.capacity) <= 0)) {
-      throw new BadRequestException('Informe ao menos um tipo com preço e capacidade positivos.');
+    if (
+      ticketTypes.length === 0 ||
+      ticketTypes.some(
+        (type) =>
+          !type.name?.trim() ||
+          !Number.isFinite(Number(type.price)) ||
+          Number(type.price) <= 0 ||
+          !Number.isInteger(Number(type.capacity)) ||
+          Number(type.capacity) <= 0,
+      )
+    ) {
+      throw new BadRequestException(
+        'Informe ao menos um tipo com preço e capacidade positivos.',
+      );
     }
   }
 
@@ -271,13 +354,26 @@ export class EventsService {
     if (input.ticketingMode !== 'RESERVED_SEATING') return;
     const rows = Number(input.seatMap?.rows);
     const columns = Number(input.seatMap?.columns);
-    if (!Number.isInteger(rows) || !Number.isInteger(columns) ||
-      rows < 1 || rows > 26 || columns < 1 || columns > 50) {
-      throw new BadRequestException('O mapa deve ter entre 1 e 26 fileiras e até 50 assentos por fileira.');
+    if (
+      !Number.isInteger(rows) ||
+      !Number.isInteger(columns) ||
+      rows < 1 ||
+      rows > 26 ||
+      columns < 1 ||
+      columns > 50
+    ) {
+      throw new BadRequestException(
+        'O mapa deve ter entre 1 e 26 fileiras e até 50 assentos por fileira.',
+      );
     }
-    const capacity = input.ticketTypes.reduce((total, type) => total + Number(type.capacity), 0);
+    const capacity = input.ticketTypes.reduce(
+      (total, type) => total + Number(type.capacity),
+      0,
+    );
     if (capacity !== rows * columns) {
-      throw new BadRequestException('A capacidade deve ser igual à quantidade de assentos do mapa.');
+      throw new BadRequestException(
+        'A capacidade deve ser igual à quantidade de assentos do mapa.',
+      );
     }
   }
 
@@ -311,12 +407,23 @@ export class EventsService {
       seats,
       minPrice: prices.length ? Math.min(...prices) : 0,
       maxPrice: prices.length ? Math.max(...prices) : 0,
-      capacity: ticketTypes.reduce((total: number, type: any) => total + type.capacity, 0),
-      sold: ticketTypes.reduce((total: number, type: any) => total + type.sold, 0),
+      capacity: ticketTypes.reduce(
+        (total: number, type: any) => total + type.capacity,
+        0,
+      ),
+      sold: ticketTypes.reduce(
+        (total: number, type: any) => total + type.sold,
+        0,
+      ),
     };
   }
 
   private isUniqueConstraintError(error: unknown) {
-    return typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002';
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 'P2002'
+    );
   }
 }

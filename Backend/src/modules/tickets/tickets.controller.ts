@@ -3,25 +3,29 @@ import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth-guard';
 import { TicketsService } from './tickets.service';
 
-interface AuthenticatedRequest extends Request {
-  user?: Express.User & { sub: string };
-}
-
 @Controller('tickets')
-@UseGuards(JwtAuthGuard)
 export class TicketsController {
   constructor(private readonly ticketsService: TicketsService) {}
 
   @Get('my')
-  findMine(@Req() request: AuthenticatedRequest) {
+  @UseGuards(JwtAuthGuard)
+  findMine(
+    @Req() request: Request & { user?: { sub: string } },
+  ) {
     return this.ticketsService.findMine(request.user!.sub);
   }
 
   @Get('my/:id')
+  @UseGuards(JwtAuthGuard)
   findMineById(
-    @Req() request: AuthenticatedRequest,
+    @Req() request: Request & { user?: { sub: string } },
     @Param('id') id: string,
   ) {
     return this.ticketsService.findMineById(request.user!.sub, id);
+  }
+
+  @Get('shared/:shareToken')
+  findShared(@Param('shareToken') shareToken: string) {
+    return this.ticketsService.findShared(shareToken);
   }
 }

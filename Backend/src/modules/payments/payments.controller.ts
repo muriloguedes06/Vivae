@@ -1,22 +1,35 @@
-import { Controller, UseGuards, Req, Get, Post, Body } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import type { Request } from 'express';
-import { PaymentsService } from './payments.service';
 import { JwtAuthGuard } from '../auth/jwt-auth-guard';
-
-interface AuthenticatedRequest extends Request {
-  user?: Express.User & { sub: string };
-}
+import { PaymentsService } from './payments.service';
+import type { SimulatePaymentInput } from './payments.service';
 
 @Controller('payments')
+@UseGuards(JwtAuthGuard)
 export class PaymentsController {
-    constructor(private readonly payments: PaymentsService) { };
+  constructor(private readonly paymentsService: PaymentsService) {}
 
-    @Post('buy')
-    @UseGuards(JwtAuthGuard)
-    async buy(
-        @Body('itemID') itemID: string,
-        @Req() request: AuthenticatedRequest,
-    ) {
+  @Post('simulate')
+  simulate(
+    @Req() request: Request & { user?: { sub: string } },
+    @Body() input: SimulatePaymentInput,
+  ) {
+    return this.paymentsService.simulate(request.user!.sub, input);
+  }
 
-    }
+  @Get('order/:orderId')
+  findByOrder(
+    @Req() request: Request & { user?: { sub: string } },
+    @Param('orderId') orderId: string,
+  ) {
+    return this.paymentsService.findByOrder(request.user!.sub, orderId);
+  }
 }

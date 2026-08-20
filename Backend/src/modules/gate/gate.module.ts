@@ -6,6 +6,6 @@ import { AuthModule } from '../auth/auth.module';
 @Module({
   imports: [AuthModule],
   controllers: [GateController],
-  providers: [GateService]
+  providers: [GateService],
 })
 export class GateModule {}

@@ -4,7 +4,6 @@ import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './modules/users/users.module';
 import { CatalogEventsModule } from './modules/catalog-events/catalog-events.module';
 import { EventsModule } from './modules/events/events.module';
-import { TicketingModule } from './modules/ticketing/ticketing.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
@@ -17,7 +16,6 @@ import { GateModule } from './modules/gate/gate.module';
     UsersModule,
     CatalogEventsModule,
     EventsModule,
-    TicketingModule,
     OrdersModule,
     PaymentsModule,
     TicketsModule,
